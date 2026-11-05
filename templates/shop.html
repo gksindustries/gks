@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GKS Partner</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config = { theme: { extend: { colors: { navy: '#0a192f', navyDeep: '#020c1b', gold: '#d4af37', cream: '#f8f9fa' }, fontFamily: { sans: ['Outfit', 'sans-serif'], serif: ['Playfair Display', 'serif'] }, boxShadow: { 'glow': '0 0 20px rgba(212, 175, 55, 0.2)' } } } }</script>
+<style>
+  body { font-family: 'Outfit', sans-serif; background: #f8f9fa; }
+  .h-serif { font-family: 'Playfair Display', serif; }
+  .gold-gradient { background: linear-gradient(135deg, #d4af37 0%, #f4d47c 50%, #d4af37 100%); }
+  .navy-gradient { background: linear-gradient(135deg, #0a192f 0%, #020c1b 100%); }
+  .card-press:active { transform: scale(0.98); transition: 0.1s; }
+  .glass { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.5); }
+</style>
+</head>
+<body class="min-h-screen relative overflow-x-hidden">
+  <!-- Background decoration -->
+  <div class="absolute top-0 left-0 w-full h-72 navy-gradient rounded-b-[3rem] z-0"></div>
+
+<header class="relative z-10 text-white px-6 py-6">
+  <div class="max-w-4xl mx-auto flex justify-between items-center">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl gold-gradient flex items-center justify-center text-navy font-bold text-xl shadow-glow">G</div>
+      <div>
+        <p class="h-serif font-bold text-lg leading-tight">GKS Partner</p>
+        <p id="shop-name" class="text-[11px] text-goldLight opacity-80 tracking-wide">—</p>
+      </div>
+    </div>
+    <button onclick="logout()" id="logout-btn" class="hidden text-xs bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-2 rounded-xl transition">Logout</button>
+  </div>
+</header>
+
+<!-- Login View -->
+<div id="login-view" class="relative z-10 max-w-md mx-auto px-6 mt-10 animate-fade-up">
+  <div class="glass rounded-3xl shadow-xl p-8 border-t border-white/60">
+    <h2 class="h-serif text-3xl text-navy mb-1 font-bold">Welcome back</h2>
+    <p class="text-sm text-gray-500 mb-6 font-light">Apni dukaan sambhalo aur aage badho</p>
+    
+    <div class="space-y-4">
+      <div>
+        <label class="text-xs font-semibold text-gray-500 ml-1 mb-1 block">Phone Number</label>
+        <input id="l-phone" placeholder="9990000001" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gold/50 transition-all">
+      </div>
+      <div>
+        <label class="text-xs font-semibold text-gray-500 ml-1 mb-1 block">Password</label>
+        <input id="l-pass" type="password" placeholder="••••••••" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gold/50 transition-all">
+      </div>
+    </div>
+    
+    <button onclick="login()" class="mt-6 w-full gold-gradient text-navy py-3.5 rounded-xl font-bold shadow-md card-press hover:shadow-glow transition-all text-lg">Login</button>
+    <p id="l-err" class="text-red-500 text-xs mt-3 text-center font-medium"></p>
+    
+    <div class="mt-8 pt-6 border-t border-gray-200">
+      <p class="text-xs text-gray-500 text-center mb-4">Naya shop? <a href="/register" class="text-navy font-bold underline decoration-gold decoration-2 underline-offset-2">Register karo</a></p>
+      <div class="bg-gray-50 rounded-xl p-3 border border-gray-100">
+        <p class="text-[10px] text-gray-400 text-center uppercase tracking-widest mb-2 font-bold">Demo Logins (Pass: demo123)</p>
+        <div class="text-[11px] text-gray-600 flex justify-center gap-4 font-medium"><p>💎 9990000001</p><p>📱 9990000011</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Dashboard View -->
+<div id="dash-view" class="relative z-10 hidden max-w-4xl mx-auto p-6 space-y-6">
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="glass rounded-2xl p-5 shadow-lg border-l-4 border-l-gold relative overflow-hidden">
+      <div class="absolute -right-4 -top-4 text-6xl opacity-5">📦</div>
+      <p class="text-[11px] uppercase text-gray-500 font-bold tracking-wider">Total Items</p>
+      <p id="stat-items" class="h-serif text-4xl font-bold text-navy mt-2">0</p>
+    </div>
+    <div class="glass rounded-2xl p-5 shadow-lg border-l-4 border-l-green-500 relative overflow-hidden">
+      <div class="absolute -right-4 -top-4 text-6xl opacity-5">📈</div>
+      <p class="text-[11px] uppercase text-gray-500 font-bold tracking-wider">Customer Leads</p>
+      <p id="stat-leads" class="h-serif text-4xl font-bold text-navy mt-2">0</p>
+    </div>
+    <div class="glass rounded-2xl p-5 shadow-lg border-l-4 border-l-blue-500 relative overflow-hidden">
+      <div class="absolute -right-4 -top-4 text-6xl opacity-5">✅</div>
+      <p class="text-[11px] uppercase text-gray-500 font-bold tracking-wider">Account Status</p>
+      <p id="stat-status" class="text-lg font-bold text-green-600 mt-3 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Verified</p>
+    </div>
+  </div>
+
+  <div class="glass rounded-3xl p-6 shadow-xl border-t border-white/60 mt-8">
+    <h3 class="h-serif text-2xl font-bold text-navy mb-4">Naya Product Add karein</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <input id="a-name" placeholder="Product ka naam (e.g. Gold Ring)" class="md:col-span-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gold/50 transition-all">
+      <input id="a-cat" placeholder="Category (e.g. Ring)" class="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gold/50 transition-all">
+      <input id="a-price" type="number" placeholder="Price ₹" class="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gold/50 transition-all">
+      <input id="a-attr1" placeholder="Attribute 1 (e.g. 22K)" class="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gold/50 transition-all">
+      <input id="a-attr2" type="number" placeholder="Attribute 2 (e.g. 5g)" class="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gold/50 transition-all">
+    </div>
+    <button onclick="addItem()" class="mt-5 w-full navy-gradient text-white py-3.5 rounded-xl font-bold card-press hover:shadow-lg transition-all text-sm uppercase tracking-wider">+ Add Product</button>
+    <p id="a-msg" class="text-sm mt-3 text-center font-medium"></p>
+  </div>
+
+  <div class="glass rounded-3xl p-6 shadow-xl border-t border-white/60">
+    <h3 class="h-serif text-2xl font-bold text-navy mb-4">Aapke Products</h3>
+    <div id="items-list" class="space-y-3"></div>
+  </div>
+</div>
+
+<script>
+let token = localStorage.getItem('gks_token') || '';
+async function login() { 
+  const phone = document.getElementById('l-phone').value.trim(); 
+  const password = document.getElementById('l-pass').value; 
+  const res = await fetch('/shops/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone, password }) }); 
+  if (!res.ok) { document.getElementById('l-err').textContent = 'Galat phone ya password'; return; } 
+  const data = await res.json(); token = data.access_token; localStorage.setItem('gks_token', token); loadDashboard(); 
+}
+function logout() { token = ''; localStorage.removeItem('gks_token'); location.reload(); }
+
+async function loadDashboard() {
+  const h = { 'Authorization': 'Bearer ' + token };
+  try {
+    const shop = await (await fetch('/shops/me', { headers: h })).json();
+    if (!shop.id) return logout();
+    document.getElementById('login-view').classList.add('hidden'); 
+    document.getElementById('dash-view').classList.remove('hidden'); 
+    document.getElementById('logout-btn').classList.remove('hidden');
+    document.getElementById('shop-name').textContent = shop.shop_name + ' · ' + shop.city;
+    
+    const items = await (await fetch('/shops/me/items', { headers: h })).json(); 
+    document.getElementById('stat-items').textContent = items.length;
+    
+    const leads = await (await fetch('/shops/me/leads', { headers: h })).json(); 
+    document.getElementById('stat-leads').textContent = leads.total;
+    
+    document.getElementById('items-list').innerHTML = items.map(it => `
+      <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center bg-gray-50 border border-gray-100 p-4 rounded-xl gap-3">
+        <div class="flex-1 min-w-0">
+          <p class="font-bold text-navy text-base truncate">${it.name}</p>
+          <p class="text-xs text-gray-500 mt-1 font-medium">${it.category} · <span class="text-gold font-bold">₹${it.price_min}–${it.price_max}</span></p>
+        </div>
+        <button onclick="toggleStock(${it.id}, ${!it.in_stock})" class="${it.in_stock ? 'bg-green-100 text-green-700 border-green-200' : 'bg-red-100 text-red-700 border-red-200'} text-xs px-4 py-2 rounded-lg font-bold border transition-colors w-full sm:w-auto">
+          ${it.in_stock ? '✓ In Stock' : '✗ Out of Stock'}
+        </button>
+      </div>
+    `).join('') || '<p class="text-sm text-gray-400 text-center py-6 bg-gray-50 rounded-xl border border-dashed">Abhi koi product nahi. Upar se add karein.</p>';
+  } catch (e) { logout(); }
+}
+
+async function addItem() {
+  const a1 = document.getElementById('a-attr1').value; 
+  const a2 = parseFloat(document.getElementById('a-attr2').value) || 0;
+  const body = { 
+    name: document.getElementById('a-name').value, 
+    category: document.getElementById('a-cat').value, 
+    price_min: parseFloat(document.getElementById('a-price').value), 
+    price_max: parseFloat(document.getElementById('a-price').value), 
+    attributes: a1 ? { [a1 ? 'Info' : 'Qty']: a1, Qty: a2 } : { Qty: a2 }, 
+    image_urls: [], in_stock: true 
+  };
+  const msg = document.getElementById('a-msg');
+  if (!body.name || !body.price_min) { msg.textContent = '⚠️ Name aur price zaroori hai'; msg.className = 'text-sm mt-3 text-center text-red-600 font-medium'; return; }
+  
+  const res = await fetch('/shops/me/items', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify(body) });
+  if (res.ok) { 
+    msg.textContent = '✅ Product successfully add ho gaya!'; msg.className = 'text-sm mt-3 text-center text-green-600 font-medium'; 
+    ['a-name','a-cat','a-price','a-attr1','a-attr2'].forEach(id => document.getElementById(id).value = ''); 
+    loadDashboard(); 
+  } else { 
+    msg.textContent = '❌ Error aaya. Dobara try karein.'; msg.className = 'text-sm mt-3 text-center text-red-600 font-medium'; 
+  }
+}
+
+async function toggleStock(id, state) { 
+  await fetch(`/shops/me/items/${id}/stock?in_stock=${state}`, { method: 'PATCH', headers: { 'Authorization': 'Bearer ' + token } }); 
+  loadDashboard(); 
+}
+if (token) loadDashboard();
+</script>
+</body>
+</html>

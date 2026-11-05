@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GKS — Register Shop</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config = { theme: { extend: { colors: { navy: '#0a2540', gold: '#d4af37', cream: '#faf8f3' }, fontFamily: { serif: ['Playfair Display','serif'], sans: ['Inter','sans-serif'] } } } }</script>
+<style>body { font-family: 'Inter', sans-serif; } .h-serif { font-family: 'Playfair Display', serif; } .gold-gradient { background: linear-gradient(135deg, #d4af37 0%, #f4d47c 50%, #d4af37 100%); }</style>
+</head>
+<body class="bg-cream min-h-screen p-4">
+<div class="max-w-md mx-auto mt-6">
+  <div class="text-center mb-6"><div class="w-14 h-14 mx-auto rounded-full gold-gradient flex items-center justify-center text-navy font-bold text-xl mb-3 shadow-lg">G</div><h1 class="h-serif text-2xl font-bold text-navy">Apni dukaan GKS pe laao</h1><p class="text-xs text-gray-500 mt-1">Free · No commission · No delivery</p></div>
+  <div class="bg-white rounded-2xl shadow-lg p-5 space-y-3">
+    <select id="r-sector" class="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-navy"><option value="">— Sector chuno —</option><option value="GJS">💎 Jewellery</option><option value="GES">📱 Electronics</option><option value="GGS">🛒 Grocery</option><option value="GMS">💊 Medicine</option></select>
+    <input id="r-name" placeholder="Dukaan ka naam" class="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-navy">
+    <input id="r-phone" placeholder="Phone number" class="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-navy">
+    <input id="r-pass" type="password" placeholder="Password (min 6)" class="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-navy">
+    <textarea id="r-address" placeholder="Address" rows="2" class="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-navy"></textarea>
+    <div class="grid grid-cols-2 gap-2"><input id="r-city" placeholder="City" class="border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-navy"><input id="r-pincode" placeholder="Pincode" class="border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-navy"></div>
+    <input id="r-license" placeholder="GST / License (optional)" class="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-navy">
+    <button onclick="detectLoc()" class="w-full bg-gray-100 text-navy py-2.5 rounded-xl text-sm font-semibold">📍 Auto-detect location</button>
+    <p id="loc-status" class="text-[11px] text-gray-500 text-center"></p>
+    <button onclick="register()" class="w-full gold-gradient text-navy py-3 rounded-xl font-bold shadow-md">Register Shop</button>
+    <p id="r-msg" class="text-xs text-center"></p>
+    <p class="text-center text-xs text-gray-500 pt-2">Already registered? <a href="/shop" class="text-navy underline font-medium">Login</a></p>
+  </div>
+</div>
+<script>
+let lat = null, lng = null;
+function detectLoc() { const st = document.getElementById('loc-status'); st.textContent = 'Location le rahe hain...'; if (!navigator.geolocation) { st.textContent = '❌ Browser support nahi'; return; } navigator.geolocation.getCurrentPosition(p => { lat = p.coords.latitude; lng = p.coords.longitude; st.textContent = `✅ ${lat.toFixed(3)}, ${lng.toFixed(3)}`; }, () => { lat = 22.5726; lng = 88.3639; st.textContent = '⚠️ Default Kolkata use kar rahe'; }); }
+async function register() {
+  const body = { sector_code: document.getElementById('r-sector').value, shop_name: document.getElementById('r-name').value.trim(), owner_phone: document.getElementById('r-phone').value.trim(), password: document.getElementById('r-pass').value, address: document.getElementById('r-address').value.trim(), city: document.getElementById('r-city').value.trim(), pincode: document.getElementById('r-pincode').value.trim(), lat: lat || 22.5726, lng: lng || 88.3639, license_no: document.getElementById('r-license').value.trim() || null, gstin: null };
+  const msg = document.getElementById('r-msg');
+  if (!body.sector_code) { msg.textContent = '⚠️ Sector chuno'; msg.className = 'text-xs text-center text-red-600'; return; }
+  if (!body.shop_name) { msg.textContent = '⚠️ Dukaan naam'; msg.className = 'text-xs text-center text-red-600'; return; }
+  if (body.owner_phone.length < 10) { msg.textContent = '⚠️ Valid phone'; msg.className = 'text-xs text-center text-red-600'; return; }
+  if (body.password.length < 6) { msg.textContent = '⚠️ Password 6+'; msg.className = 'text-xs text-center text-red-600'; return; }
+  if (!body.address || !body.city) { msg.textContent = '⚠️ Address, city'; msg.className = 'text-xs text-center text-red-600'; return; }
+  const res = await fetch('/shops/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (res.ok) { msg.textContent = '✅ Register ho gaya! Login page pe le ja rahe...'; msg.className = 'text-xs text-center text-green-600 font-semibold'; setTimeout(() => window.location.href = '/shop', 1500); } else { const err = await res.json(); msg.textContent = '❌ ' + (err.detail || 'Error'); msg.className = 'text-xs text-center text-red-600'; }
+}
+</script>
+</body>
+</html>

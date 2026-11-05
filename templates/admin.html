@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GKS Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config = { theme: { extend: { colors: { navy: '#0a192f', navyDeep: '#020c1b', gold: '#d4af37', cream: '#f8f9fa' }, fontFamily: { sans: ['Outfit', 'sans-serif'], serif: ['Playfair Display', 'serif'] }, boxShadow: { 'glow': '0 0 20px rgba(212, 175, 55, 0.2)' } } } }</script>
+<style>
+  body { font-family: 'Outfit', sans-serif; background: #f8f9fa; }
+  .h-serif { font-family: 'Playfair Display', serif; }
+  .gold-gradient { background: linear-gradient(135deg, #d4af37 0%, #f4d47c 50%, #d4af37 100%); }
+  .navy-gradient { background: linear-gradient(135deg, #0a192f 0%, #020c1b 100%); }
+  .glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.5); }
+</style>
+</head>
+<body class="min-h-screen relative p-4 md:p-8">
+  <!-- Background decoration -->
+  <div class="absolute top-0 left-0 w-full h-64 navy-gradient rounded-b-[3rem] z-0"></div>
+
+<div class="max-w-4xl mx-auto relative z-10">
+  <div class="flex items-center gap-4 mb-8 text-white">
+    <div class="w-12 h-12 rounded-2xl gold-gradient flex items-center justify-center text-navy font-bold text-2xl shadow-glow">G</div>
+    <div>
+      <h1 class="h-serif text-3xl font-bold">GKS Admin</h1>
+      <p class="text-[11px] uppercase tracking-widest text-goldLight opacity-80">Control Panel</p>
+    </div>
+  </div>
+
+  <div class="glass rounded-3xl shadow-xl p-6 mb-8 animate-fade-up">
+    <div class="flex flex-col sm:flex-row gap-3">
+      <input id="pw" type="password" placeholder="Enter Admin Password..." class="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-5 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold/50 transition-all font-mono tracking-widest">
+      <button onclick="load()" class="gold-gradient text-navy px-8 py-3.5 rounded-xl font-bold shadow-md hover:shadow-glow transition-all whitespace-nowrap">Load Dashboard</button>
+    </div>
+  </div>
+
+  <div id="stats" class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8"></div>
+
+  <div class="glass rounded-3xl shadow-xl p-6 md:p-8 animate-fade-up" style="animation-delay: 100ms">
+    <h2 class="h-serif text-2xl font-bold text-navy mb-6 flex items-center gap-2"><span class="w-2 h-6 bg-gold rounded-full"></span> Verification Requests</h2>
+    <div id="pending" class="space-y-3"></div>
+  </div>
+</div>
+
+<script>
+async function load() {
+  const pw = document.getElementById('pw').value; 
+  const s = await (await fetch('/admin/stats?password=' + pw)).json();
+  if (s.sectors === undefined) { alert('❌ Wrong password!'); return; }
+  
+  const statCards = [
+    { label: 'Total Sectors', val: s.sectors, icon: '🌐' },
+    { label: 'Verified Shops', val: s.shops_verified, icon: '🏪' },
+    { label: 'Total Items', val: s.items_total, icon: '📦' },
+    { label: 'Customer Leads', val: s.leads_total, icon: '📈' },
+    { label: 'Pending Shops', val: s.shops_pending, icon: '⏳' },
+    { label: 'Total Shops', val: s.shops_total, icon: '📊' }
+  ];
+
+  document.getElementById('stats').innerHTML = statCards.map(c => `
+    <div class="glass rounded-2xl p-5 shadow-sm border border-gray-100 relative overflow-hidden hover:shadow-md transition-shadow">
+      <div class="absolute -right-2 -top-2 text-4xl opacity-10">${c.icon}</div>
+      <p class="text-[10px] uppercase text-gray-500 font-bold tracking-wider">${c.label}</p>
+      <p class="h-serif text-3xl font-bold text-navy mt-1">${c.val || 0}</p>
+    </div>
+  `).join('');
+
+  const p = await (await fetch('/admin/shops/pending?password=' + pw)).json();
+  document.getElementById('pending').innerHTML = p.map(sh => `
+    <div class="flex flex-col sm:flex-row justify-between sm:items-center bg-gray-50 border border-gray-100 p-4 rounded-xl gap-3">
+      <div>
+        <p class="font-bold text-navy text-base">${sh.shop_name}</p>
+        <p class="text-xs text-gray-500 mt-0.5">📍 ${sh.city} · 📞 ${sh.owner_phone}</p>
+      </div>
+      <button onclick="verify(${sh.id}, '${pw}')" class="bg-green-500 hover:bg-green-600 text-white text-xs px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors w-full sm:w-auto uppercase tracking-wide">Approve Shop</button>
+    </div>
+  `).join('') || '<div class="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-200"><p class="text-3xl mb-2">🎉</p><p class="text-sm text-gray-500 font-medium">Koi pending request nahi hai. Sab clear!</p></div>';
+}
+
+async function verify(id, pw) { 
+  await fetch(`/admin/shops/${id}/verify?password=${pw}`, { method: 'POST' }); 
+  load(); 
+}
+</script>
+</body>
+</html>

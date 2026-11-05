@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>GKS — Discover Nearby</title>
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#0a192f">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = { theme: { extend: {
+  colors: { navy: '#0a192f', navyDeep: '#020c1b', gold: '#d4af37', goldLight: '#f4d47c', cream: '#f8f9fa' },
+  fontFamily: { sans: ['Outfit', 'sans-serif'], serif: ['Playfair Display', 'serif'] },
+  boxShadow: { 'glow': '0 0 20px rgba(212, 175, 55, 0.3)', 'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.07)' },
+  animation: { 'fade-up': 'fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both', 'float': 'float 3s ease-in-out infinite' },
+  keyframes: {
+    fadeUp: { '0%': {opacity: 0, transform: 'translateY(30px)'}, '100%': {opacity: 1, transform: 'translateY(0)'} },
+    float: { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-5px)' } }
+  }
+}}}
+</script>
+<style>
+  body { font-family: 'Outfit', sans-serif; background: #f8f9fa; -webkit-tap-highlight-color: transparent; }
+  .h-serif { font-family: 'Playfair Display', serif; }
+  .gold-gradient { background: linear-gradient(135deg, #d4af37 0%, #f4d47c 50%, #d4af37 100%); }
+  .navy-gradient { background: linear-gradient(180deg, #0a192f 0%, #020c1b 100%); }
+  .glass-nav { background: rgba(10, 25, 47, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .glass-card { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); }
+  .card-press:active { transform: scale(0.96); transition: 0.1s; }
+  .sector-active { background: white; color: #0a192f; box-shadow: 0 4px 15px rgba(212,175,55,0.2); font-weight: 600; transform: translateY(-2px); }
+  .hide-scroll::-webkit-scrollbar { display: none; }
+  .logo-ring { border: 2px solid rgba(212, 175, 55, 0.3); border-top-color: #d4af37; border-radius: 50%; animation: spin 3s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body class="text-gray-800 min-h-screen pb-24">
+
+<!-- Premium Glass Header -->
+<header class="glass-nav text-white px-4 pt-5 pb-4 sticky top-0 z-30">
+  <div class="max-w-4xl mx-auto flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="relative w-10 h-10 flex items-center justify-center">
+        <div class="absolute inset-0 logo-ring"></div>
+        <div class="w-8 h-8 rounded-full gold-gradient flex items-center justify-center text-navy font-bold text-lg shadow-glow z-10">G</div>
+      </div>
+      <div>
+        <h1 class="h-serif text-xl leading-tight font-bold tracking-wide">GKS</h1>
+        <p class="text-[9px] uppercase tracking-[3px] text-goldLight opacity-90">Ganguli Kynetic</p>
+      </div>
+    </div>
+    <div class="flex gap-2 items-center">
+      <!-- Language Switcher -->
+      <button onclick="toggleLang()" id="lang-btn" class="text-[11px] bg-white/10 hover:bg-white/20 transition border border-white/20 px-2.5 py-1.5 rounded-full font-semibold">
+        🌐 EN
+      </button>
+      <button onclick="getLocation()" class="text-[11px] bg-white/10 hover:bg-white/20 transition border border-white/20 px-3 py-1.5 rounded-full flex items-center gap-1">
+        📍 <span id="loc-label" data-i18n="loc_btn">Locate</span>
+      </button>
+      <a href="/register" class="hidden sm:block text-[11px] bg-gold/20 text-goldLight border border-gold/30 px-3 py-1.5 rounded-full hover:bg-gold/30 transition" data-i18n="shop_btn">Shop →</a>
+    </div>
+  </div>
+</header>
+
+<!-- Sector Tabs -->
+<div class="bg-navyDeep px-3 pt-4 pb-5 sticky top-[76px] z-20 shadow-md">
+  <div class="max-w-4xl mx-auto flex gap-3 overflow-x-auto hide-scroll">
+    <button onclick="pickSector('GJS')" id="tab-GJS" class="sector-tab flex-shrink-0 px-5 py-2.5 rounded-xl text-xs bg-white/5 text-white/60 border border-white/10 transition-all duration-300">💎 <span data-i18n="tab_gjs">Jewellery</span></button>
+    <button onclick="pickSector('GES')" id="tab-GES" class="sector-tab flex-shrink-0 px-5 py-2.5 rounded-xl text-xs bg-white/5 text-white/60 border border-white/10 transition-all duration-300">📱 <span data-i18n="tab_ges">Electronics</span></button>
+    <button onclick="pickSector('GGS')" id="tab-GGS" class="sector-tab flex-shrink-0 px-5 py-2.5 rounded-xl text-xs bg-white/5 text-white/60 border border-white/10 transition-all duration-300">🛒 <span data-i18n="tab_ggs">Grocery</span></button>
+    <button onclick="pickSector('GMS')" id="tab-GMS" class="sector-tab flex-shrink-0 px-5 py-2.5 rounded-xl text-xs bg-white/5 text-white/60 border border-white/10 transition-all duration-300">💊 <span data-i18n="tab_gms">Medicine</span></button>
+  </div>
+</div>
+
+<main class="max-w-4xl mx-auto px-4 pt-6">
+  <div class="mb-6 animate-fade-up text-center">
+    <h2 class="h-serif text-3xl text-navy mb-2 font-bold" id="hero-title" data-i18n="hero_title_gjs">Nazdeek ki jewellery</h2>
+    <p class="text-sm text-gray-500 font-light" id="hero-sub" data-i18n="hero_sub_gjs">Apni location dein aur paas ki premium dukaanein dhundhein</p>
+  </div>
+
+  <div class="glass-card rounded-2xl shadow-glass p-2 mb-6 animate-fade-up" style="animation-delay: 100ms">
+    <div class="flex gap-2">
+      <div class="flex-1 relative">
+        <span class="absolute left-4 top-3.5 text-gray-400">🔍</span>
+        <input id="category" data-i18n-placeholder="search_placeholder" placeholder="Search rings, chains, mobiles..." onkeydown="if(event.key==='Enter')search()" class="w-full bg-gray-50/50 border-none rounded-xl pl-11 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gold/50 transition-all">
+      </div>
+      <button onclick="search()" class="gold-gradient text-navy px-6 rounded-xl text-sm font-bold shadow-md card-press hover:shadow-glow transition-all" data-i18n="search_btn">Search</button>
+    </div>
+  </div>
+
+  <div class="bg-blue-50/50 border border-blue-100 text-blue-800 text-[11px] p-3 rounded-xl mb-6 text-center animate-fade-up font-medium" style="animation-delay: 150ms" data-i18n="disclaimer">
+    ⚠️ Availability shop par confirm karein. GKS koi delivery nahi karta.
+  </div>
+
+  <div id="results" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+  
+  <div id="empty" class="hidden text-center text-gray-400 py-20 animate-fade-up">
+    <div class="text-6xl mb-4 animate-float">🔍</div>
+    <p class="text-lg font-medium text-gray-600" data-i18n="empty_title">Kuch nahi mila</p>
+    <p class="text-sm mt-1" data-i18n="empty_sub">Location dein, phir category chunein</p>
+  </div>
+</main>
+
+<!-- Floating Bottom Nav -->
+<nav class="fixed bottom-4 left-4 right-4 bg-white/90 backdrop-blur-lg border border-gray-200 shadow-2xl z-40 rounded-2xl max-w-md mx-auto">
+  <div class="flex justify-around py-3">
+    <button class="flex flex-col items-center text-navy group">
+      <span class="text-2xl group-hover:-translate-y-1 transition-transform">🏠</span><span class="text-[10px] font-bold mt-1" data-i18n="nav_home">Home</span>
+    </button>
+    <button onclick="document.getElementById('category').focus()" class="flex flex-col items-center text-gray-400 hover:text-navy transition group">
+      <span class="text-2xl group-hover:-translate-y-1 transition-transform">🔍</span><span class="text-[10px] mt-1" data-i18n="nav_search">Search</span>
+    </button>
+    <button onclick="getLocation()" class="flex flex-col items-center text-gray-400 hover:text-navy transition group">
+      <span class="text-2xl group-hover:-translate-y-1 transition-transform">📍</span><span class="text-[10px] mt-1" data-i18n="nav_near">Near me</span>
+    </button>
+    <a href="/register" class="flex flex-col items-center text-gray-400 hover:text-navy transition group">
+      <span class="text-2xl group-hover:-translate-y-1 transition-transform">🏪</span><span class="text-[10px] mt-1" data-i18n="nav_shop">Shop</span>
+    </a>
+  </div>
+</nav>
+
+<!-- Premium Modal -->
+<div id="modal" class="hidden fixed inset-0 bg-navyDeep/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center transition-opacity">
+  <div class="bg-white w-full max-w-md rounded-t-[2rem] sm:rounded-3xl p-6 max-h-[90vh] overflow-y-auto animate-fade-up shadow-2xl relative">
+    <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5 sm:hidden"></div>
+    <div class="flex justify-between items-start mb-5">
+      <div>
+        <p class="text-[10px] uppercase tracking-widest text-gold font-bold mb-1" data-i18n="modal_verified">Verified Store</p>
+        <h3 id="m-shop" class="h-serif font-bold text-2xl text-navy"></h3>
+      </div>
+      <button onclick="closeModal()" class="bg-gray-100 hover:bg-gray-200 w-8 h-8 rounded-full flex items-center justify-center text-gray-500 transition">&times;</button>
+    </div>
+    <div id="m-body"></div>
+  </div>
+</div>
+
+<script>
+// ==========================================
+// 1. LANGUAGE SYSTEM DICTIONARY
+// ==========================================
+const translations = {
+  en: {
+    loc_btn: "Locate", shop_btn: "Shop →", tab_gjs: "Jewellery", tab_ges: "Electronics", tab_ggs: "Grocery", tab_gms: "Medicine",
+    hero_title_gjs: "Nearby Jewellery", hero_sub_gjs: "Enter your location to find premium stores near you",
+    hero_title_ges: "Nearby Electronics", hero_sub_ges: "Find mobiles, laptops, and gadgets near you",
+    hero_title_ggs: "Nearby Grocery", hero_sub_ggs: "Find daily essentials near you",
+    hero_title_gms: "Nearby Pharmacy", hero_sub_gms: "Find licensed medical stores near you",
+    search_placeholder: "Search rings, chains, mobiles...", search_btn: "Search",
+    disclaimer: "⚠️ Availability is indicative. Please confirm at the shop. GKS does not deliver.",
+    empty_title: "Nothing found", empty_sub: "Enter location and select a category",
+    nav_home: "Home", nav_search: "Search", nav_near: "Near me", nav_shop: "Shop",
+    modal_verified: "Verified Store", call_btn: "Call", map_btn: "Open Maps"
+  },
+  hi: {
+    loc_btn: "लोकेशन", shop_btn: "दुकान →", tab_gjs: "ज्वेलरी", tab_ges: "इलेक्ट्रॉनिक्स", tab_ggs: "किराना", tab_gms: "दवा",
+    hero_title_gjs: "आस-पास की ज्वेलरी", hero_sub_gjs: "अपनी लोकेशन दें और पास की प्रीमियम दुकानें खोजें",
+    hero_title_ges: "आस-पास का इलेक्ट्रॉनिक्स", hero_sub_ges: "अपने पास मोबाइल, लैपटॉप और गैजेट्स खोजें",
+    hero_title_ggs: "आस-पास का किराना", hero_sub_ggs: "अपने पास रोज़मर्रा की ज़रूरतें खोजें",
+    hero_title_gms: "आस-पास की फार्मेसी", hero_sub_gms: "अपने पास लाइसेंस प्राप्त मेडिकल स्टोर खोजें",
+    search_placeholder: "रिंग, चेन, मोबाइल खोजें...", search_btn: "खोजें",
+    disclaimer: "⚠️ उपलब्धता सांकेतिक है। कृपया दुकान पर पुष्टि करें। GKS डिलीवरी नहीं करता है।",
+    empty_title: "कुछ नहीं मिला", empty_sub: "लोकेशन दें और श्रेणी चुनें",
+    nav_home: "होम", nav_search: "खोजें", nav_near: "पास में", nav_shop: "दुकान",
+    modal_verified: "सत्यापित स्टोर", call_btn: "कॉल करें", map_btn: "मैप खोलें"
+  },
+  hing: {
+    loc_btn: "Locate", shop_btn: "Shop →", tab_gjs: "Jewellery", tab_ges: "Electronics", tab_ggs: "Grocery", tab_gms: "Medicine",
+    hero_title_gjs: "Nazdeek ki Jewellery", hero_sub_gjs: "Apni location do aur paas ki premium dukaanein dhundo",
+    hero_title_ges: "Nazdeek ka Electronics", hero_sub_ges: "Mobile, laptop aur gadgets paas mein dhundo",
+    hero_title_ggs: "Nazdeek ka Grocery", hero_sub_ggs: "Atta, dal aur daily essentials paas mein dhundo",
+    hero_title_gms: "Nazdeek ki Pharmacy", hero_sub_gms: "Licensed medical stores paas mein dhundo",
+    search_placeholder: "Ring, Chain, Mobile dhundo...", search_btn: "Dhundo",
+    disclaimer: "⚠️ Availability shop par confirm karein. GKS delivery nahi karta.",
+    empty_title: "Kuch nahi mila", empty_sub: "Location do, phir category chuno",
+    nav_home: "Home", nav_search: "Search", nav_near: "Near me", nav_shop: "Shop",
+    modal_verified: "Verified Store", call_btn: "Call karein", map_btn: "Google Maps kholo"
+  }
+};
+
+let currentLang = localStorage.getItem('gks_lang') || 'en';
+const langOrder = ['en', 'hi', 'hing'];
+const langLabels = { en: '🌐 EN', hi: '🌐 HI', hing: '🌐 HING' };
+
+function toggleLang() {
+  let nextIndex = (langOrder.indexOf(currentLang) + 1) % langOrder.length;
+  currentLang = langOrder[nextIndex];
+  localStorage.setItem('gks_lang', currentLang);
+  applyLanguage();
+}
+
+function applyLanguage() {
+  document.getElementById('lang-btn').innerText = langLabels[currentLang];
+  
+  // Text elements
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (translations[currentLang][key]) {
+      el.innerText = translations[currentLang][key];
+    }
+  });
+  
+  // Placeholder elements
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    if (translations[currentLang][key]) {
+      el.placeholder = translations[currentLang][key];
+    }
+  });
+
+  // Update Hero section depending on current sector
+  updateHeroText();
+}
+
+// ==========================================
+// 2. APP LOGIC
+// ==========================================
+let lat = null, lng = null, sector = 'GJS';
+const ICON = { GJS: '💎', GES: '📱', GGS: '🛒', GMS: '💊' };
+
+function updateHeroText() {
+  const titleKey = `hero_title_${sector.toLowerCase()}`;
+  const subKey = `hero_sub_${sector.toLowerCase()}`;
+  document.getElementById('hero-title').innerText = translations[currentLang][titleKey];
+  document.getElementById('hero-sub').innerText = translations[currentLang][subKey];
+}
+
+function pickSector(s) {
+  sector = s;
+  document.querySelectorAll('.sector-tab').forEach(t => { t.classList.remove('sector-active'); t.classList.add('bg-white/5', 'text-white/60', 'border-white/10'); });
+  const t = document.getElementById('tab-' + s); t.classList.remove('bg-white/5', 'text-white/60', 'border-white/10'); t.classList.add('sector-active');
+  
+  updateHeroText();
+  document.getElementById('category').value = ''; 
+  if (lat) search();
+}
+
+function getLocation() { 
+  document.getElementById('loc-label').innerText = '...'; 
+  if (!navigator.geolocation) return fallback(); 
+  navigator.geolocation.getCurrentPosition(p => { lat = p.coords.latitude; lng = p.coords.longitude; document.getElementById('loc-label').innerText = 'Near you'; search(); }, () => fallback(), { timeout: 6000 }); 
+}
+
+function fallback() { lat = 22.5726; lng = 88.3639; document.getElementById('loc-label').innerText = 'Kolkata'; search(); }
+
+async function search() {
+  if (!lat) { getLocation(); return; }
+  const cat = document.getElementById('category').value.trim();
+  const url = `/items/nearby?lat=${lat}&lng=${lng}&sector_code=${sector}&radius_km=15` + (cat ? `&category=${encodeURIComponent(cat)}` : '');
+  document.getElementById('empty').classList.add('hidden'); document.getElementById('results').innerHTML = '';
+  try { const items = await (await fetch(url)).json(); renderResults(items); } catch (e) { document.getElementById('empty').classList.remove('hidden'); }
+}
+
+function renderResults(items) {
+  const box = document.getElementById('results'); const empty = document.getElementById('empty');
+  if (!items.length) { empty.classList.remove('hidden'); return; } empty.classList.add('hidden');
+  
+  items.forEach((it, i) => {
+    const price = it.price_min === it.price_max ? `₹${it.price_min}` : `₹${it.price_min} – ₹${it.price_max}`;
+    const chips = Object.entries(it.attributes || {}).slice(0, 3).map(([k, v]) => `<span class="text-[10px] bg-gray-100 text-gray-600 px-2.5 py-1 rounded-md font-medium border border-gray-200">${k}: ${v}</span>`).join(' ');
+    
+    const el = document.createElement('div'); 
+    el.className = 'bg-white rounded-2xl shadow-sm border border-gray-100 p-5 cursor-pointer card-press hover:shadow-xl hover:-translate-y-1 transition-all duration-300 animate-fade-up'; 
+    el.style.animationDelay = (i * 50) + 'ms'; 
+    el.onclick = () => openShop(it);
+    
+    el.innerHTML = `
+      <div class="flex justify-between items-start gap-4">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="bg-gold/10 text-gold p-1.5 rounded-lg text-sm">${ICON[sector]}</span>
+            <span class="text-[10px] uppercase tracking-wider text-gray-500 font-bold">${it.category}</span>
+          </div>
+          <h3 class="h-serif font-bold text-navy text-xl leading-tight truncate">${it.name}</h3>
+          <p class="text-navy font-bold mt-2 text-lg">${price}</p>
+          <div class="flex flex-wrap gap-1.5 mt-3">${chips}</div>
+        </div>
+        <div class="flex flex-col items-end gap-3">
+          <div class="bg-green-50 text-green-700 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wide border border-green-200 shadow-sm">In Stock</div>
+        </div>
+      </div>
+      <div class="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-sm">
+        <div class="text-gray-700 font-medium truncate flex items-center gap-1.5"><span class="text-gray-400">🏪</span> ${it.shop_name}</div>
+        <div class="text-gray-500 bg-gray-50 px-2 py-1 rounded-md flex items-center gap-1 border border-gray-100">📍 ${it.distance_km} km</div>
+      </div>
+    `;
+    box.appendChild(el);
+  });
+}
+
+async function openShop(it) {
+  document.getElementById('m-shop').textContent = it.shop_name; 
+  document.getElementById('m-body').innerHTML = '<div class="flex justify-center py-10"><div class="w-8 h-8 border-4 border-gray-200 border-t-gold rounded-full animate-spin"></div></div>'; 
+  document.getElementById('modal').classList.remove('hidden');
+  
+  fetch('/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_id: it.item_id, shop_id: it.shop_id, event_type: 'address_shared' }) }).catch(() => {});
+  
+  const c = await (await fetch(`/shops/${it.shop_id}/contact`)).json();
+  const callTxt = translations[currentLang].call_btn;
+  const mapTxt = translations[currentLang].map_btn;
+  
+  document.getElementById('m-body').innerHTML = `
+    <div class="space-y-4">
+      <div class="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+        <p class="text-sm font-semibold text-navy mb-1">${c.shop_name}</p>
+        <p class="text-sm text-gray-600 leading-relaxed">${c.address}, ${c.city} — ${c.pincode}</p>
+      </div>
+      <a href="tel:${c.phone}" class="block gold-gradient text-navy text-center py-3.5 rounded-xl font-bold shadow-md card-press text-lg">📞 ${callTxt} ${c.phone}</a>
+      <a href="${c.map_url}" target="_blank" class="block bg-navy text-white text-center py-3.5 rounded-xl font-semibold card-press">🗺️ ${mapTxt}</a>
+      <p class="text-[11px] text-gray-400 text-center pt-2 leading-relaxed">${c.disclaimer}</p>
+    </div>
+  `;
+}
+function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+
+// Init
+applyLanguage();
+pickSector('GJS');
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/static/sw.js');
+</script>
+</body>
+</html>
