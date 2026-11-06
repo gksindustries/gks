@@ -1,6 +1,93 @@
+from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+from sqlalchemy.orm import Session
+from math import radians, sin, cos, asin, sqrt
+from typing import Optional
+import os
+
+from database import Base, engine, get_db, SessionLocal
+from models import Sector, Shop, ShopUser, Item, Lead, Referral, SectorField
+from schemas import SectorOut, ShopRegister, ShopLogin, TokenOut, ItemCreate, ItemOut, NearbyItem, LeadCreate, ReferralCreate
+from auth import hash_password, verify_password, create_access_token, get_current_shop_user
+
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(title="GKS — Ganguli Kynetic System", version="1.0.0")
+ADMIN_PASSWORD = os.getenv("GKS_ADMIN_PASSWORD", "gks_admin_2024")
+
+def haversine_km(lat1, lng1, lat2, lng2):
+    R = 6371.0
+    dlat = radians(lat2 - lat1)
+    dlng = radians(lng2 - lng1)
+    a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlng/2)**2
+    return 2 * R * asin(sqrt(a))
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/", response_class=HTMLResponse)
+def root():
+    return '<meta http-equiv="refresh" content="0; url=/app">'
+
+@app.get("/app")
+def customer_app():
+    return FileResponse("templates/index.html")
+
+@app.get("/shop")
+def shop_app():
+    return FileResponse("templates/shop.html")
+
+@app.get("/admin")
+def admin_app():
+    return FileResponse("templates/admin.html")
+
+@app.get("/register")
+def register_page():
+    return FileResponse("templates/register.html")
+
+@app.get("/sectors", response_model=list[SectorOut])
+def list_sectors(db: Session = Depends(get_db)):
+    return db.query(Sector).filter(Sector.is_active == True).all()
+
+@app.get("/items/nearby", response_model=list[NearbyItem])
+def nearby_items(lat: float = Query(...), lng: float = Query(...), sector_code: str = Query(...), radius_km: float = Query(10.0, ge=0.1, le=100), category: Optional[str] = None, limit: int = Query(50, le=200), db: Session = Depends(get_db)):
+    sector = db.query(Sector).filter(Sector.code == sector_code.upper()).first()
+    if not sector:
+        raise HTTPException(404, "Sector not found")
+    q = db.query(Item, Shop).join(Shop, Item.shop_id == Shop.id).filter(Item.sector_id == sector.id, Item.is_active == True, Item.in_stock == True, Shop.status == "verified")
+    if category:
+        q = q.filter(Item.category.ilike(f"%{category}%"))
+    results = []
+    for item, shop in q.all():
+        d = haversine_km(lat, lng, shop.lat, shop.lng)
+        if d <= radius_km:
+            results.append(NearbyItem(item_id=item.id, name=item.name, category=item.category or "", price_min=item.price_min or 0, price_max=item.price_max or 0, attributes=item.attributes or {}, shop_id=shop.id, shop_name=shop.shop_name, address=shop.address or "", city=shop.city or "", pincode=shop.pincode or "", phone=shop.owner_phone, distance_km=round(d, 2)))
+    results.sort(key=lambda x: x.distance_km)
+    return results[:limit]
+
+@app.get("/shops/{shop_id}/contact")
+def shop_contact(shop_id: int, db: Session = Depends(get_db)):
+    shop = db.query(Shop).filter(Shop.id == shop_id, Shop.status == "verified").first()
+    if not shop:
+        raise HTTPException(404, "Shop not found")
+    return {"shop_name": shop.shop_name, "address": shop.address, "city": shop.city, "pincode": shop.pincode, "phone": shop.owner_phone, "map_url": f"https://maps.google.com/?q={shop.lat},{shop.lng}", "disclaimer": "Availability indicative. Please confirm at the shop."}
+
+@app.post("/leads")
+def create_lead(payload: LeadCreate, db: Session = Depends(get_db)):
+    lead = Lead(item_id=payload.item_id, shop_id=payload.shop_id, session_id="anon", event_type=payload.event_type)
+    db.add(lead)
+    db.commit()
+    return {"status": "logged", "lead_id": lead.id}
+
+@app.post("/referrals")
+def create_referral(payload: ReferralCreate, db: Session = Depends(get_db)):
+    ref = Referral(to_shop_id=payload.shop_id, service_name=payload.service_name, customer_phone=payload.customer_phone)
+    db.add(ref)
+    db.commit()
+    return {"status": "created", "referral_id": ref.id}
+
 @app.post("/shops/register")
 def register_shop(payload: ShopRegister, db: Session = Depends(get_db)):
-    # यह कोड चेक करेगा कि अगर डेटाबेस खाली है तो सेक्टर खुद बन जाएं
     if db.query(Sector).count() == 0:
         db.add_all([
             Sector(code="GJS", name="GJS Jewellery"),
@@ -10,7 +97,6 @@ def register_shop(payload: ShopRegister, db: Session = Depends(get_db)):
         ])
         db.commit()
 
-    # बाकी पुराना कोड वैसा ही रहेगा
     sector = db.query(Sector).filter(Sector.code == payload.sector_code.upper()).first()
     if not sector:
         raise HTTPException(404, "Invalid sector code")
@@ -35,4 +121,73 @@ def register_shop(payload: ShopRegister, db: Session = Depends(get_db)):
     db.flush()
     db.add(ShopUser(shop_id=shop.id, phone=payload.owner_phone, password_hash=hash_password(payload.password), role="owner"))
     db.commit()
-    return {"status": "verified", "shop_id": shop.id, "message": "Shop live ho gayi"}
+    return {"status": "verified", "shop_id": shop.id, "message": "Shop live successfully"}
+
+@app.post("/shops/login", response_model=TokenOut)
+def login_shop(payload: ShopLogin, db: Session = Depends(get_db)):
+    user = db.query(ShopUser).filter(ShopUser.phone == payload.phone).first()
+    if not user or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(401, "Invalid phone or password")
+    token = create_access_token({"sub": user.phone})
+    return TokenOut(access_token=token)
+
+@app.get("/shops/me")
+def my_shop(user: ShopUser = Depends(get_current_shop_user), db: Session = Depends(get_db)):
+    shop = db.query(Shop).filter(Shop.id == user.shop_id).first()
+    if not shop:
+        raise HTTPException(404, "Shop not found")
+    return {"id": shop.id, "shop_name": shop.shop_name, "city": shop.city, "status": shop.status, "lat": shop.lat, "lng": shop.lng, "items_count": len(shop.items)}
+
+@app.post("/shops/me/items", response_model=ItemOut)
+def add_item(payload: ItemCreate, user: ShopUser = Depends(get_current_shop_user), db: Session = Depends(get_db)):
+    shop = db.query(Shop).filter(Shop.id == user.shop_id).first()
+    item = Item(sector_id=shop.sector_id, shop_id=shop.id, name=payload.name, category=payload.category, description=payload.description, price_min=payload.price_min, price_max=payload.price_max, image_urls=payload.image_urls, attributes=payload.attributes, in_stock=payload.in_stock)
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+@app.get("/shops/me/items", response_model=list[ItemOut])
+def my_items(user: ShopUser = Depends(get_current_shop_user), db: Session = Depends(get_db)):
+    return db.query(Item).filter(Item.shop_id == user.shop_id).order_by(Item.id.desc()).all()
+
+@app.patch("/shops/me/items/{item_id}/stock")
+def toggle_stock(item_id: int, in_stock: bool, user: ShopUser = Depends(get_current_shop_user), db: Session = Depends(get_db)):
+    item = db.query(Item).filter(Item.id == item_id, Item.shop_id == user.shop_id).first()
+    if not item:
+        raise HTTPException(404, "Item not found")
+    item.in_stock = in_stock
+    db.commit()
+    return {"status": "updated", "in_stock": in_stock}
+
+@app.get("/shops/me/leads")
+def my_leads(user: ShopUser = Depends(get_current_shop_user), db: Session = Depends(get_db)):
+    leads = db.query(Lead).filter(Lead.shop_id == user.shop_id).all()
+    return {"total": len(leads), "leads": [{"id": l.id, "item_id": l.item_id, "type": l.event_type, "at": l.created_at} for l in leads]}
+
+@app.get("/admin/stats")
+def admin_stats(password: str = Query(...), db: Session = Depends(get_db)):
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(403, "Invalid admin password")
+    return {"sectors": db.query(Sector).count(), "shops_total": db.query(Shop).count(), "shops_pending": db.query(Shop).filter(Shop.status == "pending").count(), "shops_verified": db.query(Shop).filter(Shop.status == "verified").count(), "items_total": db.query(Item).count(), "leads_total": db.query(Lead).count()}
+
+@app.on_event("startup")
+def seed_if_empty():
+    db = SessionLocal()
+    try:
+        if db.query(Sector).count() == 0:
+            db.add_all([
+                Sector(code="GJS", name="GJS Jewellery"),
+                Sector(code="GES", name="GES Electronics"),
+                Sector(code="GGS", name="GGS Grocery"),
+                Sector(code="GMS", name="GMS Medicine")
+            ])
+            db.commit()
+    except Exception as e:
+        print(f"Startup Seed Error: {e}")
+    finally:
+        db.close()
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
