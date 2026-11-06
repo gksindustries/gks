@@ -1,194 +1,280 @@
-from fastapi import FastAPI, Depends, HTTPException, Query
-from fastapi.responses import HTMLResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
-from sqlalchemy.orm import Session
-from math import radians, sin, cos, asin, sqrt
-from typing import Optional
-import os
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>GKS — Premium Discovery</title>
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#02060F">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = { theme: { extend: {
+  colors: { bg: '#02060F', card: '#0A1128', border: '#1E2A45', gold: '#D4AF37', goldLight: '#F3E5AB', textMain: '#F8F9FA', textMuted: '#94A3B8' },
+  fontFamily: { sans: ['Plus Jakarta Sans', 'sans-serif'], serif: ['Cinzel', 'serif'] },
+  boxShadow: { 'glow': '0 0 20px rgba(212, 175, 55, 0.15)', 'card': '0 8px 30px rgba(0, 0, 0, 0.4)' },
+  animation: { 'fade-up': 'fadeUp 0.5s ease-out both', 'float': 'float 4s ease-in-out infinite' },
+  keyframes: {
+    fadeUp: { '0%': {opacity: 0, transform: 'translateY(20px)'}, '100%': {opacity: 1, transform: 'translateY(0)'} },
+    float: { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-5px)' } }
+  }
+}}}
+</script>
+<style>
+  body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #02060F; color: #F8F9FA; -webkit-tap-highlight-color: transparent; }
+  .h-serif { font-family: 'Cinzel', serif; }
+  .gold-gradient { background: linear-gradient(135deg, #D4AF37 0%, #F3E5AB 50%, #D4AF37 100%); }
+  .gold-text { background: linear-gradient(135deg, #D4AF37 0%, #F3E5AB 50%, #D4AF37 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .glass-nav { background: rgba(2, 6, 15, 0.8); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid rgba(212, 175, 55, 0.15); }
+  .glass-card { background: rgba(10, 17, 40, 0.8); backdrop-filter: blur(10px); border: 1px solid #1E2A45; }
+  .card-press:active { transform: scale(0.96); transition: 0.1s; }
+  .sector-active { background: rgba(212, 175, 55, 0.1); color: #D4AF37; border-color: #D4AF37; box-shadow: 0 0 15px rgba(212, 175, 55, 0.2); font-weight: 600; }
+  .hide-scroll::-webkit-scrollbar { display: none; }
+  .logo-ring { border: 2px solid rgba(212, 175, 55, 0.1); border-top-color: #D4AF37; border-radius: 50%; animation: spin 3s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body class="min-h-screen pb-24">
 
-from database import Base, engine, get_db, SessionLocal
-from models import Sector, Shop, ShopUser, Item, Lead, Referral, SectorField
-from schemas import SectorOut, ShopRegister, ShopLogin, TokenOut, ItemCreate, ItemOut, NearbyItem, LeadCreate, ReferralCreate
-from auth import hash_password, verify_password, create_access_token, get_current_shop_user
+<!-- Header -->
+<header class="glass-nav px-4 pt-5 pb-4 sticky top-0 z-30">
+  <div class="max-w-4xl mx-auto flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="relative w-10 h-10 flex items-center justify-center">
+        <div class="absolute inset-0 logo-ring"></div>
+        <div class="w-8 h-8 rounded-full gold-gradient flex items-center justify-center text-bg font-bold text-lg shadow-glow z-10 h-serif">G</div>
+      </div>
+      <div>
+        <h1 class="h-serif text-xl leading-tight font-bold text-white tracking-wide">GKS</h1>
+        <p class="text-[9px] uppercase tracking-[3px] text-goldLight opacity-80">Ganguli Kynetic</p>
+      </div>
+    </div>
+    <div class="flex gap-2 items-center">
+      <button onclick="toggleLang()" id="lang-btn" class="text-[11px] bg-card hover:bg-border transition border border-border text-goldLight px-3 py-1.5 rounded-full font-semibold">🌐 EN</button>
+      <button onclick="getLocation()" class="text-[11px] bg-card hover:bg-border transition border border-border text-textMain px-3 py-1.5 rounded-full flex items-center gap-1">
+        <svg class="w-3 h-3 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path></svg>
+        <span id="loc-label" data-i18n="loc_btn">Locate</span>
+      </button>
+    </div>
+  </div>
+</header>
 
-Base.metadata.create_all(bind=engine)
+<!-- Sector Tabs -->
+<div class="bg-bg px-3 pt-4 pb-5 sticky top-[76px] z-20 border-b border-border/50">
+  <div class="max-w-4xl mx-auto flex gap-3 overflow-x-auto hide-scroll">
+    <button onclick="pickSector('GJS')" id="tab-GJS" class="sector-tab flex-shrink-0 px-4 py-2.5 rounded-xl text-xs bg-card text-textMuted border border-border transition-all duration-300 flex items-center gap-2">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg>
+      <span data-i18n="tab_gjs">Jewellery</span>
+    </button>
+    <button onclick="pickSector('GES')" id="tab-GES" class="sector-tab flex-shrink-0 px-4 py-2.5 rounded-xl text-xs bg-card text-textMuted border border-border transition-all duration-300 flex items-center gap-2">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+      <span data-i18n="tab_ges">Electronics</span>
+    </button>
+    <button onclick="pickSector('GGS')" id="tab-GGS" class="sector-tab flex-shrink-0 px-4 py-2.5 rounded-xl text-xs bg-card text-textMuted border border-border transition-all duration-300 flex items-center gap-2">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+      <span data-i18n="tab_ggs">Grocery</span>
+    </button>
+    <button onclick="pickSector('GMS')" id="tab-GMS" class="sector-tab flex-shrink-0 px-4 py-2.5 rounded-xl text-xs bg-card text-textMuted border border-border transition-all duration-300 flex items-center gap-2">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+      <span data-i18n="tab_gms">Medicine</span>
+    </button>
+  </div>
+</div>
 
-app = FastAPI(title="GKS — Ganguli Kynetic System", version="1.0.0")
-ADMIN_PASSWORD = os.getenv("GKS_ADMIN_PASSWORD", "gks_admin_2024")
+<main class="max-w-4xl mx-auto px-4 pt-6">
+  <div class="mb-6 animate-fade-up text-center">
+    <h2 class="h-serif text-2xl text-white mb-2 font-bold" id="hero-title" data-i18n="hero_title_gjs">Nazdeek ki jewellery</h2>
+    <p class="text-sm text-textMuted font-light" id="hero-sub" data-i18n="hero_sub_gjs">Apni location dein aur paas ki premium dukaanein dhundhein</p>
+  </div>
 
-def haversine_km(lat1, lng1, lat2, lng2):
-    R = 6371.0
-    dlat = radians(lat2 - lat1)
-    dlng = radians(lng2 - lng1)
-    a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlng/2)**2
-    return 2 * R * asin(sqrt(a))
+  <div class="glass-card rounded-2xl p-2 mb-6 animate-fade-up shadow-card" style="animation-delay: 100ms">
+    <div class="flex gap-2">
+      <div class="flex-1 relative">
+        <svg class="w-5 h-5 absolute left-4 top-3 text-textMuted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+        <input id="category" data-i18n-placeholder="search_placeholder" placeholder="Search rings, chains, mobiles..." onkeydown="if(event.key==='Enter')search()" class="w-full bg-bg border border-border text-white rounded-xl pl-11 pr-4 py-3 text-sm focus:outline-none focus:border-gold transition-all">
+      </div>
+      <button onclick="search()" class="gold-gradient text-bg px-6 rounded-xl text-sm font-bold card-press hover:shadow-glow transition-all" data-i18n="search_btn">Search</button>
+    </div>
+  </div>
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+  <div class="bg-gold/10 border border-gold/20 text-goldLight text-[11px] p-3 rounded-xl mb-6 text-center animate-fade-up font-medium" style="animation-delay: 150ms" data-i18n="disclaimer">
+    ⚠️ Availability shop par confirm karein. GKS koi delivery nahi karta.
+  </div>
 
-@app.get("/", response_class=HTMLResponse)
-def root():
-    return '<meta http-equiv="refresh" content="0; url=/app">'
+  <div id="results" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+  
+  <div id="empty" class="hidden text-center py-20 animate-fade-up">
+    <div class="text-6xl mb-4 animate-float text-gold opacity-50">✨</div>
+    <p class="text-lg font-medium text-white" data-i18n="empty_title">Kuch nahi mila</p>
+    <p class="text-sm text-textMuted mt-1" data-i18n="empty_sub">Location dein, phir category chunein</p>
+  </div>
+</main>
 
-@app.get("/app")
-def customer_app():
-    return FileResponse("templates/index.html")
+<!-- Bottom Nav -->
+<nav class="fixed bottom-4 left-4 right-4 bg-card/95 backdrop-blur-lg border border-border shadow-2xl z-40 rounded-2xl max-w-md mx-auto">
+  <div class="flex justify-around py-3">
+    <button class="flex flex-col items-center text-gold group">
+      <svg class="w-6 h-6 group-hover:-translate-y-1 transition-transform" fill="currentColor" viewBox="0 0 20 20"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"></path></svg>
+      <span class="text-[10px] font-bold mt-1" data-i18n="nav_home">Home</span>
+    </button>
+    <button onclick="document.getElementById('category').focus()" class="flex flex-col items-center text-textMuted hover:text-gold transition group">
+      <svg class="w-6 h-6 group-hover:-translate-y-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+      <span class="text-[10px] mt-1" data-i18n="nav_search">Search</span>
+    </button>
+    <a href="/register" class="flex flex-col items-center text-textMuted hover:text-gold transition group">
+      <svg class="w-6 h-6 group-hover:-translate-y-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+      <span class="text-[10px] mt-1" data-i18n="nav_shop">Shop</span>
+    </a>
+  </div>
+</nav>
 
-@app.get("/shop")
-def shop_app():
-    return FileResponse("templates/shop.html")
+<!-- Modal -->
+<div id="modal" class="hidden fixed inset-0 bg-bg/90 backdrop-blur-md z-50 flex items-end sm:items-center justify-center transition-opacity">
+  <div class="bg-card w-full max-w-md rounded-t-[2rem] sm:rounded-3xl p-6 max-h-[90vh] overflow-y-auto animate-fade-up shadow-2xl relative border-t border-gold/30">
+    <div class="w-12 h-1.5 bg-border rounded-full mx-auto mb-5 sm:hidden"></div>
+    <div class="flex justify-between items-start mb-5">
+      <div>
+        <p class="text-[10px] uppercase tracking-widest text-gold font-bold mb-1" data-i18n="modal_verified">Verified Store</p>
+        <h3 id="m-shop" class="h-serif font-bold text-2xl text-white"></h3>
+      </div>
+      <button onclick="closeModal()" class="bg-border hover:bg-gray-600 w-8 h-8 rounded-full flex items-center justify-center text-white transition">&times;</button>
+    </div>
+    <div id="m-body"></div>
+  </div>
+</div>
 
-@app.get("/admin")
-def admin_app():
-    return FileResponse("templates/admin.html")
+<script>
+const translations = {
+  en: { loc_btn: "Locate", tab_gjs: "Jewellery", tab_ges: "Electronics", tab_ggs: "Grocery", tab_gms: "Medicine", hero_title_gjs: "Nearby Jewellery", hero_sub_gjs: "Enter your location to find premium stores near you", hero_title_ges: "Nearby Electronics", hero_sub_ges: "Find mobiles, laptops, and gadgets near you", hero_title_ggs: "Nearby Grocery", hero_sub_ggs: "Find daily essentials near you", hero_title_gms: "Nearby Pharmacy", hero_sub_gms: "Find licensed medical stores near you", search_placeholder: "Search rings, chains, mobiles...", search_btn: "Search", disclaimer: "⚠️ Availability is indicative. Please confirm at the shop. GKS does not deliver.", empty_title: "Nothing found", empty_sub: "Enter location and select a category", nav_home: "Home", nav_search: "Search", nav_shop: "Shop", modal_verified: "Verified Store", call_btn: "Call", map_btn: "Open Maps" },
+  hi: { loc_btn: "लोकेशन", tab_gjs: "ज्वेलरी", tab_ges: "इलेक्ट्रॉनिक्स", tab_ggs: "किराना", tab_gms: "दवा", hero_title_gjs: "आस-पास की ज्वेलरी", hero_sub_gjs: "अपनी लोकेशन दें और पास की प्रीमियम दुकानें खोजें", hero_title_ges: "आस-पास का इलेक्ट्रॉनिक्स", hero_sub_ges: "अपने पास मोबाइल, लैपटॉप और गैजेट्स खोजें", hero_title_ggs: "आस-पास का किराना", hero_sub_ggs: "अपने पास रोज़मर्रा की ज़रूरतें खोजें", hero_title_gms: "आस-पास की फार्मेसी", hero_sub_gms: "अपने पास लाइसेंस प्राप्त मेडिकल स्टोर खोजें", search_placeholder: "रिंग, चेन, मोबाइल खोजें...", search_btn: "खोजें", disclaimer: "⚠️ उपलब्धता सांकेतिक है। कृपया दुकान पर पुष्टि करें। GKS डिलीवरी नहीं करता है।", empty_title: "कुछ नहीं मिला", empty_sub: "लोकेशन दें और श्रेणी चुनें", nav_home: "होम", nav_search: "खोजें", nav_shop: "दुकान", modal_verified: "सत्यापित स्टोर", call_btn: "कॉल करें", map_btn: "मैप खोलें" },
+  hing: { loc_btn: "Locate", tab_gjs: "Jewellery", tab_ges: "Electronics", tab_ggs: "Grocery", tab_gms: "Medicine", hero_title_gjs: "Nazdeek ki Jewellery", hero_sub_gjs: "Apni location do aur paas ki premium dukaanein dhundo", hero_title_ges: "Nazdeek ka Electronics", hero_sub_ges: "Mobile, laptop aur gadgets paas mein dhundo", hero_title_ggs: "Nazdeek ka Grocery", hero_sub_ggs: "Atta, dal aur daily essentials paas mein dhundo", hero_title_gms: "Nazdeek ki Pharmacy", hero_sub_gms: "Licensed medical stores paas mein dhundo", search_placeholder: "Ring, Chain, Mobile dhundo...", search_btn: "Dhundo", disclaimer: "⚠️ Availability shop par confirm karein. GKS delivery nahi karta.", empty_title: "Kuch nahi mila", empty_sub: "Location do, phir category chuno", nav_home: "Home", nav_search: "Search", nav_shop: "Shop", modal_verified: "Verified Store", call_btn: "Call karein", map_btn: "Google Maps kholo" }
+};
 
-@app.get("/register")
-def register_page():
-    return FileResponse("templates/register.html")
+let currentLang = localStorage.getItem('gks_lang') || 'en';
+const langOrder = ['en', 'hi', 'hing'];
+const langLabels = { en: '🌐 EN', hi: '🌐 HI', hing: '🌐 HING' };
 
-@app.get("/sectors", response_model=list[SectorOut])
-def list_sectors(db: Session = Depends(get_db)):
-    return db.query(Sector).filter(Sector.is_active == True).all()
+function toggleLang() {
+  let nextIndex = (langOrder.indexOf(currentLang) + 1) % langOrder.length;
+  currentLang = langOrder[nextIndex];
+  localStorage.setItem('gks_lang', currentLang);
+  applyLanguage();
+}
 
-@app.get("/items/nearby", response_model=list[NearbyItem])
-def nearby_items(lat: float = Query(...), lng: float = Query(...), sector_code: str = Query(...), radius_km: float = Query(10.0, ge=0.1, le=100), category: Optional[str] = None, limit: int = Query(50, le=200), db: Session = Depends(get_db)):
-    sector = db.query(Sector).filter(Sector.code == sector_code.upper()).first()
-    if not sector:
-        raise HTTPException(404, "Sector not found")
-    q = db.query(Item, Shop).join(Shop, Item.shop_id == Shop.id).filter(Item.sector_id == sector.id, Item.is_active == True, Item.in_stock == True, Shop.status == "verified")
-    if category:
-        q = q.filter(Item.category.ilike(f"%{category}%"))
-    results = []
-    for item, shop in q.all():
-        d = haversine_km(lat, lng, shop.lat, shop.lng)
-        if d <= radius_km:
-            results.append(NearbyItem(item_id=item.id, name=item.name, category=item.category or "", price_min=item.price_min or 0, price_max=item.price_max or 0, attributes=item.attributes or {}, shop_id=shop.id, shop_name=shop.shop_name, address=shop.address or "", city=shop.city or "", pincode=shop.pincode or "", phone=shop.owner_phone, distance_km=round(d, 2)))
-    results.sort(key=lambda x: x.distance_km)
-    return results[:limit]
+function applyLanguage() {
+  document.getElementById('lang-btn').innerText = langLabels[currentLang];
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (translations[currentLang][key]) el.innerText = translations[currentLang][key];
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    if (translations[currentLang][key]) el.placeholder = translations[currentLang][key];
+  });
+  updateHeroText();
+}
 
-@app.get("/shops/{shop_id}/contact")
-def shop_contact(shop_id: int, db: Session = Depends(get_db)):
-    shop = db.query(Shop).filter(Shop.id == shop_id, Shop.status == "verified").first()
-    if not shop:
-        raise HTTPException(404, "Shop not found")
-    return {"shop_name": shop.shop_name, "address": shop.address, "city": shop.city, "pincode": shop.pincode, "phone": shop.owner_phone, "map_url": f"https://maps.google.com/?q={shop.lat},{shop.lng}", "disclaimer": "Availability indicative. Please confirm at the shop."}
+let lat = null, lng = null, sector = 'GJS';
+function updateHeroText() {
+  const titleKey = `hero_title_${sector.toLowerCase()}`;
+  const subKey = `hero_sub_${sector.toLowerCase()}`;
+  document.getElementById('hero-title').innerText = translations[currentLang][titleKey];
+  document.getElementById('hero-sub').innerText = translations[currentLang][subKey];
+}
 
-@app.post("/leads")
-def create_lead(payload: LeadCreate, db: Session = Depends(get_db)):
-    lead = Lead(item_id=payload.item_id, shop_id=payload.shop_id, session_id="anon", event_type=payload.event_type)
-    db.add(lead)
-    db.commit()
-    return {"status": "logged", "lead_id": lead.id}
+function pickSector(s) {
+  sector = s;
+  document.querySelectorAll('.sector-tab').forEach(t => { t.classList.remove('sector-active'); });
+  const t = document.getElementById('tab-' + s); t.classList.add('sector-active');
+  updateHeroText();
+  document.getElementById('category').value = ''; 
+  if (lat) search();
+}
 
-@app.post("/referrals")
-def create_referral(payload: ReferralCreate, db: Session = Depends(get_db)):
-    ref = Referral(to_shop_id=payload.shop_id, service_name=payload.service_name, customer_phone=payload.customer_phone)
-    db.add(ref)
-    db.commit()
-    return {"status": "created", "referral_id": ref.id}
+function getLocation() { 
+  document.getElementById('loc-label').innerText = '...'; 
+  if (!navigator.geolocation) return fallback(); 
+  navigator.geolocation.getCurrentPosition(p => { lat = p.coords.latitude; lng = p.coords.longitude; document.getElementById('loc-label').innerText = 'Near you'; search(); }, () => fallback(), { timeout: 6000 }); 
+}
+function fallback() { lat = 22.5726; lng = 88.3639; document.getElementById('loc-label').innerText = 'Kolkata'; search(); }
 
-@app.post("/shops/register")
-def register_shop(payload: ShopRegister, db: Session = Depends(get_db)):
-    # Auto-seed sectors if database is empty (Render free tier reset issue)
-    if db.query(Sector).count() == 0:
-        db.add_all([
-            Sector(code="GJS", name="GJS Jewellery"),
-            Sector(code="GES", name="GES Electronics"),
-            Sector(code="GGS", name="GGS Grocery"),
-            Sector(code="GMS", name="GMS Medicine")
-        ])
-        db.commit()
+async function search() {
+  if (!lat) { getLocation(); return; }
+  const cat = document.getElementById('category').value.trim();
+  const url = `/items/nearby?lat=${lat}&lng=${lng}&sector_code=${sector}&radius_km=15` + (cat ? `&category=${encodeURIComponent(cat)}` : '');
+  document.getElementById('empty').classList.add('hidden'); document.getElementById('results').innerHTML = '';
+  try { const items = await (await fetch(url)).json(); renderResults(items); } catch (e) { document.getElementById('empty').classList.remove('hidden'); }
+}
 
-    sector = db.query(Sector).filter(Sector.code == payload.sector_code.upper()).first()
-    if not sector:
-        raise HTTPException(404, "Invalid sector code")
-        
-    if db.query(ShopUser).filter(ShopUser.phone == payload.owner_phone).first():
-        raise HTTPException(400, "Phone already registered")
-        
-    shop = Shop(
-        sector_id=sector.id, 
-        shop_name=payload.shop_name, 
-        owner_phone=payload.owner_phone, 
-        address=payload.address, 
-        city=payload.city, 
-        pincode=payload.pincode, 
-        lat=payload.lat, 
-        lng=payload.lng, 
-        license_no=payload.license_no, 
-        gstin=payload.gstin, 
-        status="verified"
-    )
-    db.add(shop)
-    db.flush()
-    db.add(ShopUser(shop_id=shop.id, phone=payload.owner_phone, password_hash=hash_password(payload.password), role="owner"))
-    db.commit()
-    return {"status": "verified", "shop_id": shop.id, "message": "Shop live successfully"}
+function renderResults(items) {
+  const box = document.getElementById('results'); const empty = document.getElementById('empty');
+  if (!items.length) { empty.classList.remove('hidden'); return; } empty.classList.add('hidden');
+  
+  items.forEach((it, i) => {
+    const price = it.price_min === it.price_max ? `₹${it.price_min}` : `₹${it.price_min} – ₹${it.price_max}`;
+    const chips = Object.entries(it.attributes || {}).slice(0, 3).map(([k, v]) => `<span class="text-[10px] bg-bg text-goldLight px-2.5 py-1 rounded-md font-medium border border-border">${k}: ${v}</span>`).join(' ');
+    
+    const el = document.createElement('div'); 
+    el.className = 'bg-card rounded-2xl shadow-card border border-border p-5 cursor-pointer card-press hover:border-gold/50 hover:shadow-glow transition-all duration-300 animate-fade-up'; 
+    el.style.animationDelay = (i * 50) + 'ms'; 
+    el.onclick = () => openShop(it);
+    
+    el.innerHTML = `
+      <div class="flex justify-between items-start gap-4">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-[10px] uppercase tracking-wider text-gold font-bold bg-gold/10 px-2 py-0.5 rounded border border-gold/20">${it.category}</span>
+          </div>
+          <h3 class="h-serif font-bold text-white text-lg leading-tight truncate">${it.name}</h3>
+          <p class="text-goldLight font-bold mt-2 text-lg">${price}</p>
+          <div class="flex flex-wrap gap-1.5 mt-3">${chips}</div>
+        </div>
+        <div class="flex flex-col items-end gap-3">
+          <div class="bg-green-500/10 text-green-400 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wide border border-green-500/20 flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> In Stock
+          </div>
+        </div>
+      </div>
+      <div class="mt-4 pt-3 border-t border-border flex items-center justify-between text-sm">
+        <div class="text-textMuted font-medium truncate flex items-center gap-1.5"><span class="text-gold">🏪</span> ${it.shop_name}</div>
+        <div class="text-white bg-bg px-2.5 py-1 rounded-lg flex items-center gap-1 border border-border font-medium">📍 ${it.distance_km} km</div>
+      </div>
+    `;
+    box.appendChild(el);
+  });
+}
 
-@app.post("/shops/login", response_model=TokenOut)
-def login_shop(payload: ShopLogin, db: Session = Depends(get_db)):
-    user = db.query(ShopUser).filter(ShopUser.phone == payload.phone).first()
-    if not user or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(401, "Invalid phone or password")
-    token = create_access_token({"sub": user.phone})
-    return TokenOut(access_token=token)
+async function openShop(it) {
+  document.getElementById('m-shop').textContent = it.shop_name; 
+  document.getElementById('m-body').innerHTML = '<div class="flex justify-center py-10"><div class="w-8 h-8 border-4 border-border border-t-gold rounded-full animate-spin"></div></div>'; 
+  document.getElementById('modal').classList.remove('hidden');
+  
+  fetch('/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_id: it.item_id, shop_id: it.shop_id, event_type: 'address_shared' }) }).catch(() => {});
+  
+  const c = await (await fetch(`/shops/${it.shop_id}/contact`)).json();
+  document.getElementById('m-body').innerHTML = `
+    <div class="space-y-4">
+      <div class="bg-bg rounded-2xl p-4 border border-border">
+        <p class="text-sm font-bold text-white mb-1">${c.shop_name}</p>
+        <p class="text-sm text-textMuted leading-relaxed">${c.address}, ${c.city} — ${c.pincode}</p>
+      </div>
+      <a href="tel:${c.phone}" class="block gold-gradient text-bg text-center py-3.5 rounded-xl font-bold shadow-glow card-press text-lg flex justify-center items-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
+        ${translations[currentLang].call_btn} ${c.phone}
+      </a>
+      <a href="${c.map_url}" target="_blank" class="block bg-card border border-border text-white text-center py-3.5 rounded-xl font-semibold card-press flex justify-center items-center gap-2 hover:bg-border">
+        <svg class="w-5 h-5 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path></svg>
+        ${translations[currentLang].map_btn}
+      </a>
+      <p class="text-[11px] text-textMuted text-center pt-2 leading-relaxed">${c.disclaimer}</p>
+    </div>
+  `;
+}
+function closeModal() { document.getElementById('modal').classList.add('hidden'); }
 
-@app.get("/shops/me")
-def my_shop(user: ShopUser = Depends(get_current_shop_user), db: Session = Depends(get_db)):
-    shop = db.query(Shop).filter(Shop.id == user.shop_id).first()
-    if not shop:
-        raise HTTPException(404, "Shop not found")
-    return {"id": shop.id, "shop_name": shop.shop_name, "city": shop.city, "status": shop.status, "lat": shop.lat, "lng": shop.lng, "items_count": len(shop.items)}
-
-@app.post("/shops/me/items", response_model=ItemOut)
-def add_item(payload: ItemCreate, user: ShopUser = Depends(get_current_shop_user), db: Session = Depends(get_db)):
-    shop = db.query(Shop).filter(Shop.id == user.shop_id).first()
-    item = Item(sector_id=shop.sector_id, shop_id=shop.id, name=payload.name, category=payload.category, description=payload.description, price_min=payload.price_min, price_max=payload.price_max, image_urls=payload.image_urls, attributes=payload.attributes, in_stock=payload.in_stock)
-    db.add(item)
-    db.commit()
-    db.refresh(item)
-    return item
-
-@app.get("/shops/me/items", response_model=list[ItemOut])
-def my_items(user: ShopUser = Depends(get_current_shop_user), db: Session = Depends(get_db)):
-    return db.query(Item).filter(Item.shop_id == user.shop_id).order_by(Item.id.desc()).all()
-
-@app.patch("/shops/me/items/{item_id}/stock")
-def toggle_stock(item_id: int, in_stock: bool, user: ShopUser = Depends(get_current_shop_user), db: Session = Depends(get_db)):
-    item = db.query(Item).filter(Item.id == item_id, Item.shop_id == user.shop_id).first()
-    if not item:
-        raise HTTPException(404, "Item not found")
-    item.in_stock = in_stock
-    db.commit()
-    return {"status": "updated", "in_stock": in_stock}
-
-@app.get("/shops/me/leads")
-def my_leads(user: ShopUser = Depends(get_current_shop_user), db: Session = Depends(get_db)):
-    leads = db.query(Lead).filter(Lead.shop_id == user.shop_id).all()
-    return {"total": len(leads), "leads": [{"id": l.id, "item_id": l.item_id, "type": l.event_type, "at": l.created_at} for l in leads]}
-
-@app.get("/admin/stats")
-def admin_stats(password: str = Query(...), db: Session = Depends(get_db)):
-    if password != ADMIN_PASSWORD:
-        raise HTTPException(403, "Invalid admin password")
-    return {"sectors": db.query(Sector).count(), "shops_total": db.query(Shop).count(), "shops_pending": db.query(Shop).filter(Shop.status == "pending").count(), "shops_verified": db.query(Shop).filter(Shop.status == "verified").count(), "items_total": db.query(Item).count(), "leads_total": db.query(Lead).count()}
-
-@app.on_event("startup")
-def seed_if_empty():
-    db = SessionLocal()
-    try:
-        if db.query(Sector).count() == 0:
-            db.add_all([
-                Sector(code="GJS", name="GJS Jewellery"),
-                Sector(code="GES", name="GES Electronics"),
-                Sector(code="GGS", name="GGS Grocery"),
-                Sector(code="GMS", name="GMS Medicine")
-            ])
-            db.commit()
-    except Exception as e:
-        print(f"Startup Seed Error: {e}")
-    finally:
-        db.close()
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+applyLanguage();
+pickSector('GJS');
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/static/sw.js');
+</script>
+</body>
+</html>
